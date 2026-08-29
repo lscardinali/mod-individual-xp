@@ -17,6 +17,7 @@ struct IndividualXpModule
 {
     bool Enabled, AnnounceModule, AnnounceRatesOnLogin;
     float MaxRate, DefaultRate;
+    uint32 MaxBoostLevel;
 };
 
 IndividualXpModule individualXp;
@@ -32,7 +33,10 @@ enum IndividualXPAcoreString
     ACORE_STRING_COMMAND_SET,
     ACORE_STRING_COMMAND_DISABLED,
     ACORE_STRING_COMMAND_ENABLED,
-    ACORE_STRING_COMMAND_DEFAULT
+    ACORE_STRING_COMMAND_DEFAULT,
+    ACORE_STRING_COMMAND_SET_OTHER,
+    ACORE_STRING_MAX_BOOST_LEVEL,
+    ACORE_STRING_PLAYER_NOT_FOUND
 };
 
 class IndividualXPConf : public WorldScript
@@ -47,6 +51,7 @@ public:
         individualXp.AnnounceRatesOnLogin = sConfigMgr->GetOption<bool>("IndividualXp.AnnounceRatesOnLogin", true);
         individualXp.MaxRate = sConfigMgr->GetOption<float>("IndividualXp.MaxXPRate", 10.0f);
         individualXp.DefaultRate = sConfigMgr->GetOption<float>("IndividualXp.DefaultXPRate", 1.0f);
+        individualXp.MaxBoostLevel = sConfigMgr->GetOption<uint32>("IndividualXp.MaxBoostLevel", 30);
     }
 };
 
@@ -96,6 +101,11 @@ public:
                 {
                     ChatHandler(player->GetSession()).PSendSysMessage(ACORE_STRING_COMMAND_VIEW, player->CustomData.GetDefault<PlayerXpRate>("IndividualXP")->XPRate);
                     ChatHandler(player->GetSession()).PSendSysMessage(ACORE_STRING_MAX_RATE, individualXp.MaxRate);
+
+                    if (individualXp.MaxBoostLevel)
+                    {
+                        ChatHandler(player->GetSession()).PSendSysMessage(ACORE_STRING_MAX_BOOST_LEVEL, individualXp.MaxBoostLevel);
+                    }
                 }
             }
         }
@@ -109,10 +119,18 @@ public:
         }
     }
 
+    // This hook is called by the core right before the XP is granted to the player,
+    // meaning the given amount has already been calculated using the base server
+    // settings (Rate.XP.Kill, Rate.XP.Quest, etc.). The individual rate below is
+    // therefore applied *on top of* the server rates, it does not override them.
     void OnPlayerGiveXP(Player* player, uint32& amount, Unit* /*victim*/, uint8 /*xpSource*/) override
     {
         if (individualXp.Enabled)
         {
+            // Once the player reaches the configured level, the boost reverts back to 1.0x
+            if (individualXp.MaxBoostLevel && player->GetLevel() >= individualXp.MaxBoostLevel)
+                return;
+
             if (PlayerXpRate* data = player->CustomData.Get<PlayerXpRate>("IndividualXP"))
             {
                 amount = static_cast<uint32>(std::round(static_cast<float>(amount) * data->XPRate));
@@ -133,7 +151,7 @@ public:
             { "enable",  HandleEnableCommand, SEC_PLAYER, Console::No },
             { "disable",  HandleDisableCommand, SEC_PLAYER, Console::No },
             { "view",  HandleViewCommand, SEC_PLAYER, Console::No },
-            { "set",  HandleSetCommand, SEC_PLAYER, Console::No },
+            { "set",  HandleSetCommand, SEC_GAMEMASTER, Console::No },
             { "default",  HandleDefaultCommand, SEC_PLAYER, Console::No }
         };
 
@@ -172,7 +190,7 @@ public:
         return true;
     }
 
-    static bool HandleSetCommand(ChatHandler* handler, float rate)
+    static bool HandleSetCommand(ChatHandler* handler, Optional<PlayerIdentifier> target, float rate)
     {
         if (!individualXp.Enabled)
         {
@@ -181,13 +199,17 @@ public:
             return false;
         }
 
-        if (!rate)
-            return false;
+        if (!target)
+            target = PlayerIdentifier::FromSelf(handler);
 
-        Player* player = handler->GetSession()->GetPlayer();
+        Player* player = target ? target->GetConnectedPlayer() : nullptr;
 
         if (!player)
+        {
+            handler->PSendSysMessage(ACORE_STRING_PLAYER_NOT_FOUND);
+            handler->SetSentErrorMessage(true);
             return false;
+        }
 
         if (player->HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_NO_XP_GAIN))
         {
@@ -195,26 +217,36 @@ public:
             handler->SetSentErrorMessage(true);
             return false;
         }
+
+        if (rate > individualXp.MaxRate)
+        {
+            handler->PSendSysMessage(ACORE_STRING_MAX_RATE, individualXp.MaxRate);
+            handler->SetSentErrorMessage(true);
+            return false;
+        }
+
+        if (rate < 0.1f)
+        {
+            handler->PSendSysMessage(ACORE_STRING_MIN_RATE);
+            handler->SetSentErrorMessage(true);
+            return false;
+        }
+
+        player->CustomData.GetDefault<PlayerXpRate>("IndividualXP")->XPRate = rate;
+
+        WorldSession* session = handler->GetSession();
+
+        if (session && player == session->GetPlayer())
+        {
+            handler->PSendSysMessage(ACORE_STRING_COMMAND_SET, rate);
+        }
         else
         {
-            if (rate > individualXp.MaxRate)
-            {
-                handler->PSendSysMessage(ACORE_STRING_MAX_RATE, individualXp.MaxRate);
-                handler->SetSentErrorMessage(true);
-                return false;
-            }
-
-            if (rate < 0.1f)
-            {
-                handler->PSendSysMessage(ACORE_STRING_MIN_RATE);
-                handler->SetSentErrorMessage(true);
-                return false;
-            }
-
-            player->CustomData.GetDefault<PlayerXpRate>("IndividualXP")->XPRate = rate;
-            ChatHandler(handler->GetSession()).PSendSysMessage(ACORE_STRING_COMMAND_SET, rate);
-            return true;
+            handler->PSendSysMessage(ACORE_STRING_COMMAND_SET_OTHER, player->GetName(), rate);
+            ChatHandler(player->GetSession()).PSendSysMessage(ACORE_STRING_COMMAND_SET, rate);
         }
+
+        return true;
     }
 
     static bool HandleDisableCommand(ChatHandler* handler)

@@ -28,8 +28,12 @@ There are two variables to configure in the Config:
     - This is the max amount a player can set their xp to.
 - `IndividualXp.DefaultXPRate`
     - This is the default rate players start with.
+- `IndividualXp.MaxBoostLevel`
+    - Level at which the individual XP rate stops being applied (default `30`). Once a player reaches this level, they gain XP at `1.0x` again regardless of their configured rate. Set to `0` to disable the level limit.
 
 The Max XP Rate variable dictates how high a player can set their XP rate. While the Default XP Rate variable dictates what XP rate players start with and the rate will be set to if the user does `.xp default`. As a recommendation, it would be a good idea to set the default and maximum experience rates to match. In this way, all players would initially have the maximum experience on the server, and then, through the `.xp set` command, they could modify it.
+
+The individual rate is applied on top of the server rates: the core first calculates the XP using the base server settings (`Rate.XP.Kill`, `Rate.XP.Quest`, etc.) and the module then multiplies that result by the player's individual rate. It does not override the server rates.
 
 # Player Commands
 
@@ -37,10 +41,18 @@ The Max XP Rate variable dictates how high a player can set their XP rate. While
 |-------------|---------------------------------------------------|
 | .XP         | Main Module Command                               |
 | .XP View    | Displays the current XP rate                      |
-| .XP Set #   | Changes the XP rate to the value specified        |
 | .XP Default | Returns the XP rate to the default value          |
 | .XP Disable | Disables all XP gain until user does '.XP Enable' |
 | .XP Enable  | Enables all XP gain if it was disabled            |
+
+# GM Commands
+
+| Command               | Description                                       |
+|-----------------------|---------------------------------------------------|
+| .XP Set #             | Changes your own XP rate to the value specified   |
+| .XP Set $playername # | Changes the XP rate of the given (online) player  |
+
+`.xp set` requires GM (security level 2) and is no longer available to regular players.
 
 # Video Showcase
 
@@ -54,8 +66,8 @@ The Max XP Rate variable dictates how high a player can set their XP rate. While
 ```sql
 DELETE FROM `command` WHERE `name` IN ('xp', 'xp set', 'xp view', 'xp default', 'xp enable', 'xp disable');
 
-SET @ENTRY:=35411;
-DELETE FROM `acore_string` WHERE `entry` BETWEEN @ENTRY+0 AND @ENTRY+9;
+SET @ENTRY:=100000;
+DELETE FROM `acore_string` WHERE `entry` BETWEEN @ENTRY+0 AND @ENTRY+12;
 ```
 
 ### Database Characters
