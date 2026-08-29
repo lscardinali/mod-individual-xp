@@ -61,3 +61,16 @@ IndividualXp.MaxXPRate = 10
 #
 
 IndividualXp.DefaultXPRate = 1
+
+#
+#   IndividualXp.MaxBoostLevel
+#
+#   Description: Level at which the individual XP rate stops being applied.
+#                Once a player reaches this level, their XP rate reverts back to 1.0x
+#                regardless of the rate they have configured.
+#                Set to 0 to disable the level limit (the rate is always applied).
+#
+#   Default: 30
+#
+
+IndividualXp.MaxBoostLevel = 30
