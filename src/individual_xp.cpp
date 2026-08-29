@@ -234,7 +234,9 @@ public:
 
         player->CustomData.GetDefault<PlayerXpRate>("IndividualXP")->XPRate = rate;
 
-        if (player == handler->GetSession()->GetPlayer())
+        WorldSession* session = handler->GetSession();
+
+        if (session && player == session->GetPlayer())
         {
             handler->PSendSysMessage(ACORE_STRING_COMMAND_SET, rate);
         }

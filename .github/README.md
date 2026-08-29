@@ -47,10 +47,10 @@ The individual rate is applied on top of the server rates: the core first calcul
 
 # GM Commands
 
-| Command                | Description                                                    |
-|------------------------|----------------------------------------------------------------|
-| .XP Set #              | Changes your own XP rate to the value specified                 |
-| .XP Set $playername #  | Changes the XP rate of the given (online) player                |
+| Command               | Description                                       |
+|-----------------------|---------------------------------------------------|
+| .XP Set #             | Changes your own XP rate to the value specified   |
+| .XP Set $playername # | Changes the XP rate of the given (online) player  |
 
 `.xp set` requires GM (security level 2) and is no longer available to regular players.
 
